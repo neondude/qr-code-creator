@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>2D Code Creator</title>
+  <script src="https://cdn.jsdelivr.net/npm/bwip-js@4.5.1/dist/bwip-js-min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: #f0f2f5;
+      color: #333;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      padding: 40px 16px;
+    }
+    .container {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.08);
+      padding: 36px 40px;
+      max-width: 520px;
+      width: 100%;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 28px;
+      text-align: center;
+      color: #1a1a2e;
+    }
+    .form-group {
+      margin-bottom: 20px;
+    }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+      font-size: 0.9rem;
+    }
+    select, input {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1.5px solid #ccc;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      transition: border-color 0.2s;
+    }
+    select:focus, input:focus {
+      outline: none;
+      border-color: #4361ee;
+    }
+    input.invalid {
+      border-color: #e63946;
+    }
+    .hint {
+      font-size: 0.78rem;
+      color: #888;
+      margin-top: 4px;
+    }
+    .error-msg {
+      font-size: 0.82rem;
+      color: #e63946;
+      margin-top: 4px;
+      display: none;
+    }
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 24px;
+    }
+    button {
+      flex: 1;
+      padding: 12px 0;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s, opacity 0.2s;
+    }
+    button:active { opacity: 0.85; }
+    .btn-generate {
+      background: #4361ee;
+      color: #fff;
+    }
+    .btn-generate:hover { background: #3a56d4; }
+    .btn-pdf {
+      background: #2ec4b6;
+      color: #fff;
+    }
+    .btn-pdf:hover { background: #25a99d; }
+    .btn-pdf:disabled {
+      background: #b0b0b0;
+      cursor: not-allowed;
+    }
+    .preview-area {
+      margin-top: 28px;
+      text-align: center;
+      min-height: 60px;
+    }
+    .preview-area canvas {
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+    }
+    .preview-label {
+      font-size: 0.82rem;
+      color: #888;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>2D Code Creator</h1>
+
+    <div class="form-group">
+      <label for="codeType">Code Type</label>
+      <select id="codeType">
+        <option value="qrcode">QR Code</option>
+        <option value="datamatrix">Data Matrix</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label for="codeInput">Code Value</label>
+      <input
+        type="text"
+        id="codeInput"
+        maxlength="20"
+        placeholder="e.g. ABC1234567890XYZWUV"
+        value="ABC1234567890XYZWUV"
+        autocomplete="off"
+        spellcheck="false"
+      >
+      <div class="hint">1–20 characters, A-Z and 0-9 only</div>
+      <div class="error-msg" id="inputError"></div>
+    </div>
+
+    <div class="form-group">
+      <label>Page Size (mm)</label>
+      <div style="display:flex;gap:12px">
+        <div style="flex:1">
+          <input
+            type="number"
+            id="pageWidth"
+            min="5"
+            max="300"
+            value="30"
+            step="1"
+            placeholder="Width"
+          >
+          <div class="hint">Width</div>
+        </div>
+        <div style="flex:1">
+          <input
+            type="number"
+            id="pageHeight"
+            min="5"
+            max="300"
+            value="30"
+            step="1"
+            placeholder="Height"
+          >
+          <div class="hint">Height</div>
+        </div>
+      </div>
+      <div class="hint" style="margin-top:4px">The code stays square, centered on the page (2 mm margin min).</div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn-generate" id="btnGenerate">Generate</button>
+      <button class="btn-pdf" id="btnPdf" disabled>Download PDF</button>
+    </div>
+
+    <div class="preview-area" id="previewArea"></div>
+  </div>
+
+  <script>
+    (() => {
+      const codeTypeEl   = document.getElementById('codeType');
+      const codeInputEl  = document.getElementById('codeInput');
+      const pageWidthEl  = document.getElementById('pageWidth');
+      const pageHeightEl = document.getElementById('pageHeight');
+      const btnGenerate  = document.getElementById('btnGenerate');
+      const btnPdf      = document.getElementById('btnPdf');
+      const previewArea = document.getElementById('previewArea');
+      const inputError  = document.getElementById('inputError');
+
+      // Auto-uppercase as user types
+      codeInputEl.addEventListener('input', () => {
+        const pos = codeInputEl.selectionStart;
+        codeInputEl.value = codeInputEl.value.toUpperCase();
+        codeInputEl.setSelectionRange(pos, pos);
+        clearError();
+      });
+
+      function showError(msg) {
+        inputError.textContent = msg;
+        inputError.style.display = 'block';
+        codeInputEl.classList.add('invalid');
+      }
+
+      function clearError() {
+        inputError.style.display = 'none';
+        codeInputEl.classList.remove('invalid');
+      }
+
+      function validate() {
+        clearError();
+        const val = codeInputEl.value.trim();
+        if (!val) {
+          showError('Please enter a code value.');
+          return null;
+        }
+        if (val.length > 20) {
+          showError('Maximum 20 characters allowed.');
+          return null;
+        }
+        if (!/^[A-Z0-9]+$/.test(val)) {
+          showError('Only A-Z and 0-9 are allowed.');
+          return null;
+        }
+        const pw = parseInt(pageWidthEl.value, 10);
+        const ph = parseInt(pageHeightEl.value, 10);
+        if (!pw || pw < 5 || pw > 300 || !ph || ph < 5 || ph > 300) {
+          showError('Page width and height must be between 5 and 300 mm.');
+          return null;
+        }
+        return { text: val, type: codeTypeEl.value, pageW: pw, pageH: ph };
+      }
+
+      // Convert mm to pixels at a given DPI
+      function mmToPx(mm, dpi) {
+        return Math.round((mm / 25.4) * dpi);
+      }
+
+      // Render barcode onto a new canvas and return it
+      function renderBarcode(opts) {
+        // Code is square, sized to fit the smaller page dimension minus 2mm margin each side
+        const codeMm = Math.min(opts.pageW, opts.pageH) - 4;
+
+        const canvas = document.createElement('canvas');
+
+        const bwipOpts = {
+          bcid:        opts.type,
+          text:        opts.text,
+          scale:       1,
+          width:       codeMm,   // bwip-js accepts mm
+          height:      codeMm,
+          includetext: false,
+        };
+
+        // For QR code, set eclevel
+        if (opts.type === 'qrcode') {
+          bwipOpts.eclevel = 'M';
+        }
+
+        try {
+          bwipjs.toCanvas(canvas, bwipOpts);
+        } catch (e) {
+          throw new Error('Barcode generation failed: ' + e.message);
+        }
+        return canvas;
+      }
+
+      let lastCanvas = null;
+      let lastOpts = null;
+
+      btnGenerate.addEventListener('click', () => {
+        const opts = validate();
+        if (!opts) return;
+
+        previewArea.innerHTML = '';
+
+        try {
+          const canvas = renderBarcode(opts);
+          lastCanvas = canvas;
+          lastOpts = opts;
+
+          // Display the canvas at a reasonable preview size (max 250px)
+          const maxPreview = 250;
+          const displayPx = Math.min(maxPreview, mmToPx(Math.min(opts.pageW, opts.pageH), 96));
+          canvas.style.width  = displayPx + 'px';
+          canvas.style.height = displayPx + 'px';
+
+          previewArea.appendChild(canvas);
+
+          const lbl = document.createElement('div');
+          lbl.className = 'preview-label';
+          lbl.textContent = `${opts.type === 'qrcode' ? 'QR Code' : 'Data Matrix'}  ·  ${opts.pageW}×${opts.pageH} mm page  ·  "${opts.text}"`;
+          previewArea.appendChild(lbl);
+
+          btnPdf.disabled = false;
+        } catch (err) {
+          previewArea.innerHTML = '<div style="color:#e63946;margin-top:12px;">' +
+            err.message.replace(/</g, '&lt;') + '</div>';
+          btnPdf.disabled = true;
+        }
+      });
+
+      btnPdf.addEventListener('click', () => {
+        if (!lastCanvas || !lastOpts) return;
+
+        const { jsPDF } = window.jspdf;
+        const pw = lastOpts.pageW;
+        const ph = lastOpts.pageH;
+
+        // Square barcode centered on the page with 2mm min margin
+        const margin = 2;
+        const maxCode = Math.min(pw, ph) - margin * 2;
+        const codeX = (pw - maxCode) / 2;
+        const codeY = (ph - maxCode) / 2;
+
+        const doc = new jsPDF({
+          orientation: pw >= ph ? 'landscape' : 'portrait',
+          unit: 'mm',
+          format: [pw, ph],
+        });
+
+        // Add the barcode image, square and centered
+        const imgData = lastCanvas.toDataURL('image/png');
+        doc.addImage(imgData, 'PNG', codeX, codeY, maxCode, maxCode);
+
+        const filename = `${lastOpts.type}_${lastOpts.text}_${pw}x${ph}mm.pdf`;
+        doc.save(filename);
+      });
+    })();
+  </script>
+</body>
+</html>
