@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Code Builder</title>
+  <style>
+    :root {
+      --card-bg: #f8f9fa;
+      --card-border: #dee2e6;
+      --primary: #0d6efd;
+      --success: #198754;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      margin: 2rem;
+      line-height: 1.5;
+      color: #333;
+    }
+
+    h1 {
+      font-size: 1.6rem;
+      margin-bottom: 1.5rem;
+    }
+
+    /* ── Form Grid ── */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .field-group {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .field-group label {
+      font-weight: bold;
+      font-size: 0.85rem;
+      margin-bottom: 0.3rem;
+      color: #555;
+    }
+
+    .field-group label .pos {
+      display: inline-block;
+      background: var(--primary);
+      color: #fff;
+      border-radius: 3px;
+      padding: 0 0.35rem;
+      font-size: 0.75rem;
+      margin-right: 0.3rem;
+      vertical-align: middle;
+    }
+
+    .field-group select,
+    .field-group input {
+      padding: 0.45rem 0.5rem;
+      font-size: 0.95rem;
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+      background: #fff;
+    }
+
+    .field-group select:focus,
+    .field-group input:focus {
+      outline: none;
+      border-color: var(--primary);
+      box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.15);
+    }
+
+    /* ── Manual Input Row ── */
+    .manual-row {
+      display: flex;
+      gap: 0.5rem;
+    }
+
+    .manual-row input {
+      width: 3rem;
+      text-align: center;
+      text-transform: uppercase;
+      font-size: 1rem;
+      padding: 0.45rem 0.3rem;
+      border: 1px solid var(--card-border);
+      border-radius: 4px;
+    }
+
+    /* ── Output Section ── */
+    .output-section {
+      margin-top: 1rem;
+      padding: 1.5rem;
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+    }
+
+    .output-label {
+      font-weight: bold;
+      font-size: 0.9rem;
+      margin-bottom: 0.5rem;
+      color: #555;
+    }
+
+    .position-numbers {
+      display: flex;
+      gap: 0;
+      margin-bottom: 0.15rem;
+    }
+
+    .position-numbers span {
+      width: 1.6rem;
+      text-align: center;
+      font-size: 0.65rem;
+      color: #999;
+      font-family: 'Courier New', monospace;
+    }
+
+    .code-display-row {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+    }
+
+    .code-chars {
+      display: flex;
+      gap: 0;
+    }
+
+    .code-chars span {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 1.6rem;
+      height: 2rem;
+      font-family: 'Courier New', monospace;
+      font-size: 1.2rem;
+      font-weight: bold;
+      border: 1px solid #ccc;
+      background: #fff;
+    }
+
+    .code-chars span.filled {
+      background: #e8f5e9;
+      border-color: #a5d6a7;
+      color: #2e7d32;
+    }
+
+    .code-chars span.empty {
+      color: #bbb;
+    }
+
+    .copy-btn {
+      padding: 0.5rem 1rem;
+      font-size: 0.95rem;
+      cursor: pointer;
+      background: var(--primary);
+      border: none;
+      color: #fff;
+      border-radius: 4px;
+      white-space: nowrap;
+      transition: background 0.2s;
+    }
+
+    .copy-btn:hover {
+      background: #0b5ed7;
+    }
+
+    .copy-btn.copied {
+      background: var(--success);
+    }
+
+    /* ── Section Dividers ── */
+    .section-title {
+      grid-column: 1 / -1;
+      font-size: 1rem;
+      font-weight: bold;
+      color: var(--primary);
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 0.3rem;
+      margin-top: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>QR Code Builder — 20 Character Code</h1>
+
+    <div class="form-grid">
+
+      <!-- ── Identification ── -->
+      <div class="section-title">Identification</div>
+
+      <div class="field-group">
+        <label><span class="pos">1-2</span> Supplier</label>
+        <select v-model="selectedSupplier">
+          <option value="">— Select —</option>
+          <option v-for="s in suppliers" :key="s.code" :value="s.code">{{ s.name }} ({{ s.code }})</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label><span class="pos">3</span> Model</label>
+        <select v-model="selectedModel">
+          <option value="">— Select —</option>
+          <option v-for="m in models" :key="m.code" :value="m.code">{{ m.name }} ({{ m.code }})</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label><span class="pos">4-5</span> Part Name</label>
+        <select v-model="selectedPart">
+          <option value="">— Select —</option>
+          <option v-for="p in parts" :key="p.code" :value="p.code">{{ p.name }} ({{ p.code }})</option>
+        </select>
+      </div>
+
+      <!-- ── Date & Time ── -->
+      <div class="section-title">Date &amp; Time</div>
+
+      <div class="field-group">
+        <label><span class="pos">6</span> Year</label>
+        <select v-model="year">
+          <option value="">— Select —</option>
+          <option v-for="y in yearOptions" :key="y.value" :value="y.value">{{ y.label }}</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label><span class="pos">7</span> Month</label>
+        <select v-model="month">
+          <option value="">— Select —</option>
+          <option v-for="m in monthOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label><span class="pos">8</span> Day</label>
+        <select v-model="day">
+          <option value="">— Select —</option>
+          <option v-for="d in dayOptions" :key="d.value" :value="d.value">{{ d.label }}</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label><span class="pos">9</span> Hour</label>
+        <select v-model="hour">
+          <option value="">— Select —</option>
+          <option v-for="h in hourOptions" :key="h.value" :value="h.value">{{ h.label }}</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label><span class="pos">10</span> Minutes (tens)</label>
+        <select v-model="minutesTens">
+          <option value="">— Select —</option>
+          <option v-for="t in minutesTensOptions" :key="t" :value="t">{{ t }}</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label><span class="pos">11</span> Minutes (units)</label>
+        <select v-model="minutesUnits">
+          <option value="">— Select —</option>
+          <option v-for="u in minutesUnitsOptions" :key="u" :value="u">{{ u }}</option>
+        </select>
+      </div>
+
+      <!-- ── Inspection ── -->
+      <div class="section-title">Inspection Results</div>
+
+      <div class="field-group">
+        <label><span class="pos">12</span> EOL Results 1</label>
+        <select v-model="eolResult1">
+          <option value="">— Select —</option>
+          <option v-for="i in inspectionOptions" :key="i.code" :value="i.code">{{ i.label }}</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label><span class="pos">13</span> EOL Results 2</label>
+        <select v-model="eolResult2">
+          <option value="">— Select —</option>
+          <option v-for="i in inspectionOptions" :key="i.code" :value="i.code">{{ i.label }}</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label><span class="pos">14</span> Final Inspection</label>
+        <select v-model="finalInspection">
+          <option value="">— Select —</option>
+          <option v-for="i in inspectionOptions" :key="i.code" :value="i.code">{{ i.label }}</option>
+        </select>
+      </div>
+
+      <!-- ── Vendor & Special ── -->
+      <div class="section-title">Vendor &amp; Special Process</div>
+
+      <div class="field-group">
+        <label><span class="pos">15-17</span> T2 Vendor (Lot Code)</label>
+        <select v-model="selectedVendor">
+          <option value="">— Select —</option>
+          <option v-for="v in vendors" :key="v.code" :value="v.code">{{ v.name }} ({{ v.code }})</option>
+        </select>
+      </div>
+
+      <div class="field-group">
+        <label><span class="pos">18-20</span> Special Process / Lot Code</label>
+        <div class="manual-row">
+          <input maxlength="1" v-model="char18" @input="forceUpper('char18', $event)" placeholder="_" />
+          <input maxlength="1" v-model="char19" @input="forceUpper('char19', $event)" placeholder="_" />
+          <input maxlength="1" v-model="char20" @input="forceUpper('char20', $event)" placeholder="_" />
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Generated Code Output ── -->
+    <div class="output-section">
+      <div class="output-label">Generated 20-Character Code</div>
+
+      <div class="position-numbers">
+        <span v-for="n in 20" :key="n">{{ n }}</span>
+      </div>
+
+      <div class="code-display-row">
+        <div class="code-chars">
+          <span
+            v-for="(ch, i) in codeArray"
+            :key="i"
+            :class="ch !== '_' ? 'filled' : 'empty'"
+          >{{ ch }}</span>
+        </div>
+
+        <button
+          class="copy-btn"
+          :class="{ copied: copySuccess }"
+          @click="copyCode"
+        >{{ copySuccess ? 'Copied!' : 'Copy' }}</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          // ── Dropdown data (extend these arrays to add more options) ──
+          suppliers: [
+            { name: "Sri Lakshmi Industries", code: "1L" }
+          ],
+          models: [
+            { name: "BI3", code: "J" }
+          ],
+          parts: [
+            { name: "43860-02500 (FORK SHIFT 3,4 BI3)", code: "1J" }
+          ],
+          vendors: [
+            { name: "Sri Lakshmi Industries", code: "5L1" }
+          ],
+          inspectionOptions: [
+            { label: "OK", code: "1" },
+            { label: "NG", code: "2" }
+          ],
+
+          // ── Form state ──
+          selectedSupplier: "",
+          selectedModel: "",
+          selectedPart: "",
+          year: "",
+          month: "",
+          day: "",
+          hour: "",
+          minutesTens: "",
+          minutesUnits: "",
+          eolResult1: "",
+          eolResult2: "",
+          finalInspection: "",
+          selectedVendor: "",
+          char18: "",
+          char19: "",
+          char20: "",
+          copySuccess: false
+        };
+      },
+
+      computed: {
+        // ── Year options: 2026–2056 → encoded 1-9, A-V ──
+        yearOptions() {
+          const opts = [];
+          for (let y = 2026; y <= 2056; y++) {
+            opts.push({ value: y, label: y + " → " + this.encodeNumeric(y - 2025) });
+          }
+          return opts;
+        },
+
+        // ── Month options: 1–12 → A–L ──
+        monthOptions() {
+          const names = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+          ];
+          return names.map((n, i) => ({
+            value: i + 1,
+            label: n + " → " + String.fromCharCode(65 + i)
+          }));
+        },
+
+        // ── Day options: 1–31 dynamic based on selected month/year ──
+        dayOptions() {
+          const maxDay = (this.year && this.month)
+            ? new Date(this.year, this.month, 0).getDate()
+            : 31;
+          const opts = [];
+          for (let d = 1; d <= maxDay; d++) {
+            opts.push({ value: d, label: d + " → " + this.encodeNumeric(d) });
+          }
+          return opts;
+        },
+
+        // ── Hour options: 1–24 → 1-9, A-O ──
+        hourOptions() {
+          const opts = [];
+          for (let h = 1; h <= 24; h++) {
+            opts.push({ value: h, label: h + " → " + this.encodeNumeric(h) });
+          }
+          return opts;
+        },
+
+        // ── Minutes options ──
+        minutesTensOptions() {
+          return [0, 1, 2, 3, 4, 5];
+        },
+        minutesUnitsOptions() {
+          return [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+        },
+
+        // ── Build the 20-char code ──
+        generatedCode() {
+          const p = (v, len) => v || "_".repeat(len || 1);
+
+          const c1_2  = p(this.selectedSupplier, 2);
+          const c3    = p(this.selectedModel);
+          const c4_5  = p(this.selectedPart, 2);
+          const c6    = this.year  ? this.encodeNumeric(this.year - 2025) : "_";
+          const c7    = this.month ? String.fromCharCode(64 + this.month) : "_";
+          const c8    = this.day   ? this.encodeNumeric(this.day) : "_";
+          const c9    = this.hour  ? this.encodeNumeric(this.hour) : "_";
+          const c10   = this.minutesTens  !== "" ? String(this.minutesTens) : "_";
+          const c11   = this.minutesUnits !== "" ? String(this.minutesUnits) : "_";
+          const c12   = p(this.eolResult1);
+          const c13   = p(this.eolResult2);
+          const c14   = p(this.finalInspection);
+          const c15_17 = p(this.selectedVendor, 3);
+          const c18   = this.char18 || "_";
+          const c19   = this.char19 || "_";
+          const c20   = this.char20 || "_";
+
+          return c1_2 + c3 + c4_5 + c6 + c7 + c8 + c9 + c10 + c11 + c12 + c13 + c14 + c15_17 + c18 + c19 + c20;
+        },
+
+        codeArray() {
+          return this.generatedCode.split("");
+        }
+      },
+
+      watch: {
+        // Reset day if it exceeds max for newly selected month/year
+        month() { this.clampDay(); },
+        year()  { this.clampDay(); }
+      },
+
+      methods: {
+        /**
+         * Encode a 1-based number: 1→'1', …, 9→'9', 10→'A', 11→'B', …
+         */
+        encodeNumeric(n) {
+          if (n >= 1 && n <= 9) return String(n);
+          return String.fromCharCode(55 + n); // 10 → 'A' (65), 11 → 'B', …
+        },
+
+        /** Force input to uppercase and allow only 1-9, A-Z */
+        forceUpper(field, event) {
+          let v = event.target.value.toUpperCase();
+          if (v && !/^[1-9A-Z]$/.test(v)) v = "";
+          this[field] = v;
+        },
+
+        /** Clamp day to valid range when month/year changes */
+        clampDay() {
+          if (this.year && this.month) {
+            const maxDay = new Date(this.year, this.month, 0).getDate();
+            if (this.day > maxDay) this.day = "";
+          }
+        },
+
+        /** Copy generated code to clipboard */
+        async copyCode() {
+          try {
+            await navigator.clipboard.writeText(this.generatedCode);
+            this.copySuccess = true;
+            setTimeout(() => { this.copySuccess = false; }, 2000);
+          } catch {
+            // Fallback for older browsers / non-HTTPS contexts
+            const ta = document.createElement("textarea");
+            ta.value = this.generatedCode;
+            ta.style.position = "fixed";
+            ta.style.opacity = "0";
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand("copy");
+            document.body.removeChild(ta);
+            this.copySuccess = true;
+            setTimeout(() => { this.copySuccess = false; }, 2000);
+          }
+        }
+      }
+    }).mount("#app");
+  </script>
+</body>
+</html>
