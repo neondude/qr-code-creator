@@ -156,7 +156,7 @@
     }
 
     .copy-btn {
-      padding: 0.5rem 1rem;
+      padding: 0.2rem 0.5rem;
       font-size: 0.95rem;
       cursor: pointer;
       background: var(--primary);
@@ -173,6 +173,29 @@
 
     .copy-btn.copied {
       background: var(--success);
+    }
+
+    /* ── Mobile Responsive ── */
+    @media (max-width: 600px) {
+      .output-section {
+        padding: 1rem;
+        overflow-x: scroll;
+        -webkit-overflow-scrolling: touch;
+      }
+
+      .position-numbers,
+      .code-display-row {
+        min-width: max-content;
+      }
+
+      .code-chars span,
+      .position-numbers span {
+        width: 1.3rem;
+      }
+
+      .code-chars span {
+        height: 1.7rem;
+      }
     }
 
     /* ── Section Dividers ── */
@@ -321,7 +344,13 @@
 
     <!-- ── Generated Code Output ── -->
     <div class="output-section">
-      <div class="output-label">Generated 20-Character Code</div>
+      <div class="output-label">Generated 20-Character Code 
+        <button
+          class="copy-btn"
+          :class="{ copied: copySuccess }"
+          @click="copyCode"
+        >{{ copySuccess ? 'Copied!' : 'Copy' }}</button>
+      </div>
 
       <div class="position-numbers">
         <span v-for="n in 20" :key="n">{{ n }}</span>
@@ -336,12 +365,9 @@
           >{{ ch }}</span>
         </div>
 
-        <button
-          class="copy-btn"
-          :class="{ copied: copySuccess }"
-          @click="copyCode"
-        >{{ copySuccess ? 'Copied!' : 'Copy' }}</button>
+
       </div>
+
     </div>
   </div>
 
