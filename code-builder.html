@@ -4,29 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>QR Code Builder</title>
+  <link rel="stylesheet" href="common.css" />
   <style>
-    :root {
-      --card-bg: #f8f9fa;
-      --card-border: #dee2e6;
-      --primary: #0d6efd;
-      --success: #198754;
-    }
-
-    * {
-      box-sizing: border-box;
-    }
-
-    body {
-      font-family: Arial, sans-serif;
-      margin: 2rem;
-      line-height: 1.5;
-      color: #333;
-    }
-
-    h1 {
-      font-size: 1.6rem;
-      margin-bottom: 1.5rem;
-    }
+    /* ── Builder-specific styles ── */
 
     /* ── Form Grid ── */
     .form-grid {
@@ -89,113 +69,6 @@
       padding: 0.45rem 0.3rem;
       border: 1px solid var(--card-border);
       border-radius: 4px;
-    }
-
-    /* ── Output Section ── */
-    .output-section {
-      margin-top: 1rem;
-      padding: 1.5rem;
-      background: var(--card-bg);
-      border: 1px solid var(--card-border);
-      border-radius: 8px;
-    }
-
-    .output-label {
-      font-weight: bold;
-      font-size: 0.9rem;
-      margin-bottom: 0.5rem;
-      color: #555;
-    }
-
-    .position-numbers {
-      display: flex;
-      gap: 0;
-      margin-bottom: 0.15rem;
-    }
-
-    .position-numbers span {
-      width: 1.6rem;
-      text-align: center;
-      font-size: 0.65rem;
-      color: #999;
-      font-family: 'Courier New', monospace;
-    }
-
-    .code-display-row {
-      display: flex;
-      align-items: center;
-      gap: 1rem;
-    }
-
-    .code-chars {
-      display: flex;
-      gap: 0;
-    }
-
-    .code-chars span {
-      display: inline-flex;
-      align-items: center;
-      justify-content: center;
-      width: 1.6rem;
-      height: 2rem;
-      font-family: 'Courier New', monospace;
-      font-size: 1.2rem;
-      font-weight: bold;
-      border: 1px solid #ccc;
-      background: #fff;
-    }
-
-    .code-chars span.filled {
-      background: #e8f5e9;
-      border-color: #a5d6a7;
-      color: #2e7d32;
-    }
-
-    .code-chars span.empty {
-      color: #bbb;
-    }
-
-    .copy-btn {
-      padding: 0.2rem 0.5rem;
-      font-size: 0.95rem;
-      cursor: pointer;
-      background: var(--primary);
-      border: none;
-      color: #fff;
-      border-radius: 4px;
-      white-space: nowrap;
-      transition: background 0.2s;
-    }
-
-    .copy-btn:hover {
-      background: #0b5ed7;
-    }
-
-    .copy-btn.copied {
-      background: var(--success);
-    }
-
-    /* ── Mobile Responsive ── */
-    @media (max-width: 600px) {
-      .output-section {
-        padding: 1rem;
-        overflow-x: scroll;
-        -webkit-overflow-scrolling: touch;
-      }
-
-      .position-numbers,
-      .code-display-row {
-        min-width: max-content;
-      }
-
-      .code-chars span,
-      .position-numbers span {
-        width: 1.3rem;
-      }
-
-      .code-chars span {
-        height: 1.7rem;
-      }
     }
 
     /* ── Section Dividers ── */
@@ -346,8 +219,8 @@
     <div class="output-section">
       <div class="output-label">Generated 20-Character Code 
         <button
-          class="copy-btn"
-          :class="{ copied: copySuccess }"
+          class="action-btn"
+          :class="{ success: copySuccess }"
           @click="copyCode"
         >{{ copySuccess ? 'Copied!' : 'Copy' }}</button>
       </div>
@@ -378,23 +251,12 @@
     createApp({
       data() {
         return {
-          // ── Dropdown data (extend these arrays to add more options) ──
-          suppliers: [
-            { name: "Sri Lakshmi Industries", code: "1L" }
-          ],
-          models: [
-            { name: "BI3", code: "J" }
-          ],
-          parts: [
-            { name: "43860-02500 (FORK SHIFT 3,4 BI3)", code: "1J" }
-          ],
-          vendors: [
-            { name: "Sri Lakshmi Industries", code: "5L1" }
-          ],
-          inspectionOptions: [
-            { label: "OK", code: "1" },
-            { label: "NG", code: "2" }
-          ],
+          // ── Lookup data (loaded from lookup-data.json) ──
+          suppliers: [],
+          models: [],
+          parts: [],
+          vendors: [],
+          inspectionOptions: [],
 
           // ── Form state ──
           selectedSupplier: "",
@@ -415,6 +277,16 @@
           char20: "",
           copySuccess: false
         };
+      },
+
+      async created() {
+        const res = await fetch('lookup-data.json');
+        const data = await res.json();
+        this.suppliers = data.suppliers;
+        this.models = data.models;
+        this.parts = data.parts;
+        this.vendors = data.vendors;
+        this.inspectionOptions = data.inspectionOptions;
       },
 
       computed: {

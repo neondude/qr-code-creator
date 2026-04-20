@@ -1,0 +1,136 @@
+/* ── common.css — Shared styles for QR Code Builder & Reader ── */
+
+:root {
+  --card-bg: #f8f9fa;
+  --card-border: #dee2e6;
+  --primary: #0d6efd;
+  --success: #198754;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: Arial, sans-serif;
+  margin: 2rem;
+  line-height: 1.5;
+  color: #333;
+}
+
+h1 {
+  font-size: 1.6rem;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Output Section (code display card) ── */
+.output-section {
+  margin-top: 1rem;
+  padding: 1.5rem;
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: 8px;
+}
+
+.output-label {
+  font-weight: bold;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+  color: #555;
+}
+
+.position-numbers {
+  display: flex;
+  gap: 0;
+  margin-bottom: 0.15rem;
+}
+
+.position-numbers span {
+  width: 1.6rem;
+  text-align: center;
+  font-size: 0.65rem;
+  color: #999;
+  font-family: 'Courier New', monospace;
+}
+
+.code-display-row {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.code-chars {
+  display: flex;
+  gap: 0;
+}
+
+.code-chars span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  height: 2rem;
+  font-family: 'Courier New', monospace;
+  font-size: 1.2rem;
+  font-weight: bold;
+  border: 1px solid #ccc;
+  background: #fff;
+}
+
+.code-chars span.filled {
+  background: #e8f5e9;
+  border-color: #a5d6a7;
+  color: #2e7d32;
+}
+
+.code-chars span.empty {
+  color: #bbb;
+}
+
+/* ── Action Button ── */
+.action-btn {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.95rem;
+  cursor: pointer;
+  background: var(--primary);
+  border: none;
+  color: #fff;
+  border-radius: 4px;
+  white-space: nowrap;
+  transition: background 0.2s;
+}
+
+.action-btn:hover {
+  background: #0b5ed7;
+}
+
+.action-btn.success {
+  background: var(--success);
+}
+
+/* ── Mobile Responsive ── */
+@media (max-width: 600px) {
+  body {
+    margin: 1rem;
+  }
+
+  .output-section {
+    padding: 1rem;
+    overflow-x: scroll;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .position-numbers,
+  .code-display-row {
+    min-width: max-content;
+  }
+
+  .code-chars span,
+  .position-numbers span {
+    width: 1.3rem;
+  }
+
+  .code-chars span {
+    height: 1.7rem;
+  }
+}

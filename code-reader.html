@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>QR Code Reader</title>
+  <link rel="stylesheet" href="common.css" />
+  <style>
+    /* ── Reader-specific styles ── */
+
+    .scan-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-width: 400px;
+      margin: 0 auto;
+    }
+
+    .scan-btn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.85rem 1.2rem;
+      font-size: 1.05rem;
+      font-weight: bold;
+      cursor: pointer;
+      border: none;
+      border-radius: 6px;
+      color: #fff;
+      transition: background 0.2s;
+      min-height: 48px;
+    }
+
+    .scan-btn.camera {
+      background: var(--primary);
+    }
+
+    .scan-btn.camera:hover {
+      background: #0b5ed7;
+    }
+
+    .scan-btn.gallery {
+      background: #6c757d;
+    }
+
+    .scan-btn.gallery:hover {
+      background: #5a6268;
+    }
+
+    .scan-btn.reset {
+      background: #dc3545;
+    }
+
+    .scan-btn.reset:hover {
+      background: #bb2d3b;
+    }
+
+    /* ── Camera Preview ── */
+    #reader {
+      max-width: 500px;
+      margin: 1.5rem auto;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    /* ── Error Message ── */
+    .error-card {
+      margin-top: 1.5rem;
+      padding: 1.2rem;
+      background: #fff3f3;
+      border: 1px solid #f5c2c7;
+      border-radius: 8px;
+      color: #842029;
+    }
+
+    .error-card strong {
+      display: block;
+      margin-bottom: 0.3rem;
+    }
+
+    /* ── Decoded Results ── */
+    .results-section {
+      margin-top: 1.5rem;
+    }
+
+    .result-group {
+      margin-bottom: 1.2rem;
+    }
+
+    .result-group-title {
+      font-size: 1rem;
+      font-weight: bold;
+      color: var(--primary);
+      border-bottom: 2px solid var(--primary);
+      padding-bottom: 0.3rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .result-row {
+      display: flex;
+      padding: 0.35rem 0;
+      border-bottom: 1px solid #eee;
+      font-size: 0.95rem;
+    }
+
+    .result-label {
+      width: 200px;
+      flex-shrink: 0;
+      font-weight: bold;
+      color: #555;
+    }
+
+    .result-value {
+      flex: 1;
+    }
+
+    .result-value.not-defined {
+      color: #999;
+      font-style: italic;
+    }
+
+    @media (max-width: 600px) {
+      .scan-buttons {
+        max-width: 100%;
+      }
+
+      #reader {
+        max-width: 100%;
+        margin: 1rem 0;
+      }
+
+      .result-row {
+        flex-direction: column;
+        gap: 0.1rem;
+      }
+
+      .result-label {
+        width: auto;
+        font-size: 0.8rem;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <h1>QR Code Reader</h1>
+
+    <!-- ── Scan Buttons (idle state) ── -->
+    <div v-if="state === 'idle'" class="scan-buttons">
+      <button class="scan-btn camera" @click="startCamera">
+        &#128247; Open Camera to Scan
+      </button>
+      <button class="scan-btn gallery" @click="openGallery">
+        &#128444; Open Gallery
+      </button>
+      <input
+        ref="fileInput"
+        type="file"
+        accept="image/*"
+        style="display: none;"
+        @change="handleFile"
+      />
+    </div>
+
+    <!-- ── Camera Preview (scanning state) ── -->
+    <div v-if="state === 'scanning'">
+      <div id="reader"></div>
+      <div class="scan-buttons" style="margin-top: 1rem;">
+        <button class="scan-btn reset" @click="stopCamera">
+          Cancel
+        </button>
+      </div>
+    </div>
+
+    <!-- ── Error Message ── -->
+    <div v-if="state === 'error'" class="error-card">
+      <strong>Invalid Code</strong>
+      {{ errorMessage }}
+    </div>
+
+    <!-- ── Decoded Results ── -->
+    <div v-if="state === 'result' || state === 'error'" class="results-section">
+
+      <!-- Raw code grid (only if we have a scanned code to show) -->
+      <div v-if="scannedCode" class="output-section" style="margin-bottom: 1.5rem;">
+        <div class="output-label">Scanned Code</div>
+        <div class="position-numbers">
+          <span v-for="n in scannedCode.length" :key="n">{{ n }}</span>
+        </div>
+        <div class="code-display-row">
+          <div class="code-chars">
+            <span
+              v-for="(ch, i) in scannedCode.split('')"
+              :key="i"
+              class="filled"
+            >{{ ch }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Decoded fields -->
+      <div v-if="decoded">
+        <div class="result-group">
+          <div class="result-group-title">Identification</div>
+          <div class="result-row">
+            <div class="result-label">Supplier (1-2)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.supplier }">
+              {{ decoded.supplier || 'Not Defined' }}
+            </div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">Model (3)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.model }">
+              {{ decoded.model || 'Not Defined' }}
+            </div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">Part Name (4-5)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.part }">
+              {{ decoded.part || 'Not Defined' }}
+            </div>
+          </div>
+        </div>
+
+        <div class="result-group">
+          <div class="result-group-title">Date &amp; Time</div>
+          <div class="result-row">
+            <div class="result-label">Year (6)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.year }">
+              {{ decoded.year || 'Not Defined' }}
+            </div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">Month (7)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.month }">
+              {{ decoded.month || 'Not Defined' }}
+            </div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">Day (8)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.day }">
+              {{ decoded.day || 'Not Defined' }}
+            </div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">Hour (9)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.hour }">
+              {{ decoded.hour || 'Not Defined' }}
+            </div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">Minutes (10-11)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.minutes }">
+              {{ decoded.minutes || 'Not Defined' }}
+            </div>
+          </div>
+        </div>
+
+        <div class="result-group">
+          <div class="result-group-title">Inspection Results</div>
+          <div class="result-row">
+            <div class="result-label">EOL Results 1 (12)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.eolResult1 }">
+              {{ decoded.eolResult1 || 'Not Defined' }}
+            </div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">EOL Results 2 (13)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.eolResult2 }">
+              {{ decoded.eolResult2 || 'Not Defined' }}
+            </div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">Final Inspection (14)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.finalInspection }">
+              {{ decoded.finalInspection || 'Not Defined' }}
+            </div>
+          </div>
+        </div>
+
+        <div class="result-group">
+          <div class="result-group-title">Vendor &amp; Special Process</div>
+          <div class="result-row">
+            <div class="result-label">T2 Vendor (15-17)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.vendor }">
+              {{ decoded.vendor || 'Not Defined' }}
+            </div>
+          </div>
+          <div class="result-row">
+            <div class="result-label">Special Process (18-20)</div>
+            <div class="result-value" :class="{ 'not-defined': !decoded.specialProcess }">
+              {{ decoded.specialProcess || 'Not Defined' }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Reset Button (after result or error) ── -->
+    <div v-if="state === 'result' || state === 'error'" class="scan-buttons" style="margin-top: 1.5rem;">
+      <button class="scan-btn reset" @click="reset">
+        &#8635; Reset
+      </button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          // Lookup data (loaded from lookup-data.json)
+          suppliers: [],
+          models: [],
+          parts: [],
+          vendors: [],
+          inspectionOptions: [],
+
+          // UI state: 'idle' | 'scanning' | 'result' | 'error'
+          state: 'idle',
+          scannedCode: '',
+          decoded: null,
+          errorMessage: '',
+          scanner: null
+        };
+      },
+
+      async created() {
+        const res = await fetch('lookup-data.json');
+        const data = await res.json();
+        this.suppliers = data.suppliers;
+        this.models = data.models;
+        this.parts = data.parts;
+        this.vendors = data.vendors;
+        this.inspectionOptions = data.inspectionOptions;
+      },
+
+      beforeUnmount() {
+        this.cleanupScanner();
+      },
+
+      methods: {
+        /** Start camera scanning */
+        async startCamera() {
+          this.state = 'scanning';
+
+          // Wait for the #reader div to render
+          await this.$nextTick();
+
+          this.scanner = new Html5Qrcode('reader', {
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.QR_CODE,
+              Html5QrcodeSupportedFormats.DATA_MATRIX
+            ]
+          });
+
+          try {
+            await this.scanner.start(
+              { facingMode: 'environment' },
+              { fps: 10, qrbox: { width: 250, height: 250 } },
+              (decodedText) => { this.onScanSuccess(decodedText); },
+              () => { /* per-frame decode failure — ignore */ }
+            );
+          } catch (err) {
+            this.state = 'error';
+            this.errorMessage = 'Could not access camera: ' + (err.message || err);
+            this.scanner = null;
+          }
+        },
+
+        /** Stop camera and cleanup */
+        async stopCamera() {
+          await this.cleanupScanner();
+          this.state = 'idle';
+        },
+
+        /** Cleanup scanner instance */
+        async cleanupScanner() {
+          if (this.scanner) {
+            try {
+              const scannerState = this.scanner.getState();
+              if (scannerState === Html5QrcodeScannerState.SCANNING ||
+                  scannerState === Html5QrcodeScannerState.PAUSED) {
+                await this.scanner.stop();
+              }
+            } catch { /* already stopped */ }
+            try { this.scanner.clear(); } catch { /* ignore */ }
+            this.scanner = null;
+          }
+        },
+
+        /** Open file picker for gallery */
+        openGallery() {
+          this.$refs.fileInput.value = '';
+          this.$refs.fileInput.click();
+        },
+
+        /** Handle file selection from gallery */
+        async handleFile(event) {
+          const file = event.target.files[0];
+          if (!file) return;
+
+          const tempScanner = new Html5Qrcode('temp-reader', {
+            formatsToSupport: [
+              Html5QrcodeSupportedFormats.QR_CODE,
+              Html5QrcodeSupportedFormats.DATA_MATRIX
+            ]
+          });
+
+          try {
+            const decodedText = await tempScanner.scanFile(file, false);
+            this.onScanSuccess(decodedText);
+          } catch {
+            this.scannedCode = '';
+            this.decoded = null;
+            this.state = 'error';
+            this.errorMessage = 'No valid QR code or Data Matrix found in the selected image.';
+          } finally {
+            try { tempScanner.clear(); } catch { /* ignore */ }
+          }
+        },
+
+        /** Handle a successful scan (from camera or gallery) */
+        async onScanSuccess(decodedText) {
+          // Stop camera if it's running
+          await this.cleanupScanner();
+
+          this.scannedCode = decodedText;
+
+          // Validate the code
+          const validation = this.validateCode(decodedText);
+          if (!validation.valid) {
+            this.decoded = null;
+            this.state = 'error';
+            this.errorMessage = validation.reason;
+            return;
+          }
+
+          // Decode the 20-character code
+          this.decoded = this.decodeCode(decodedText);
+          this.state = 'result';
+        },
+
+        /** Validate the scanned code */
+        validateCode(code) {
+          if (code.length !== 20) {
+            return {
+              valid: false,
+              reason: `Code must be exactly 20 characters (got ${code.length}).`
+            };
+          }
+          if (!/^[0-9A-Z]+$/.test(code)) {
+            return {
+              valid: false,
+              reason: 'Code contains invalid characters. Only 0-9 and A-Z are allowed.'
+            };
+          }
+          return { valid: true };
+        },
+
+        /** Reverse of encodeNumeric: '1'→1, …, '9'→9, 'A'→10, 'B'→11, … */
+        decodeNumeric(ch) {
+          const c = ch.charCodeAt(0);
+          if (c >= 48 && c <= 57) return c - 48; // '0'-'9' → 0-9
+          if (c >= 65 && c <= 90) return c - 55; // 'A'=10, 'B'=11, …
+          return null;
+        },
+
+        /** Decode the full 20-character code into readable fields */
+        decodeCode(code) {
+          const monthNames = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+          ];
+
+          // Pos 1-2: Supplier
+          const supplierCode = code.substring(0, 2);
+          const supplier = this.suppliers.find(s => s.code === supplierCode);
+
+          // Pos 3: Model
+          const modelCode = code.charAt(2);
+          const model = this.models.find(m => m.code === modelCode);
+
+          // Pos 4-5: Part
+          const partCode = code.substring(3, 5);
+          const part = this.parts.find(p => p.code === partCode);
+
+          // Pos 6: Year
+          const yearNum = this.decodeNumeric(code.charAt(5));
+          const year = (yearNum && yearNum >= 1) ? String(yearNum + 2025) : null;
+
+          // Pos 7: Month (A=1, B=2, …, L=12)
+          const monthNum = code.charCodeAt(6) - 64;
+          const month = (monthNum >= 1 && monthNum <= 12)
+            ? monthNames[monthNum - 1]
+            : null;
+
+          // Pos 8: Day
+          const dayNum = this.decodeNumeric(code.charAt(7));
+          const day = (dayNum && dayNum >= 1 && dayNum <= 31) ? String(dayNum) : null;
+
+          // Pos 9: Hour
+          const hourNum = this.decodeNumeric(code.charAt(8));
+          const hour = (hourNum && hourNum >= 1 && hourNum <= 24) ? String(hourNum) : null;
+
+          // Pos 10-11: Minutes
+          const tensCh = code.charAt(9);
+          const unitsCh = code.charAt(10);
+          let minutes = null;
+          if (/^[0-5]$/.test(tensCh) && /^[0-9]$/.test(unitsCh)) {
+            minutes = tensCh + unitsCh;
+          }
+
+          // Pos 12: EOL Results 1
+          const eol1Code = code.charAt(11);
+          const eol1 = this.inspectionOptions.find(i => i.code === eol1Code);
+
+          // Pos 13: EOL Results 2
+          const eol2Code = code.charAt(12);
+          const eol2 = this.inspectionOptions.find(i => i.code === eol2Code);
+
+          // Pos 14: Final Inspection
+          const finalCode = code.charAt(13);
+          const finalInsp = this.inspectionOptions.find(i => i.code === finalCode);
+
+          // Pos 15-17: T2 Vendor
+          const vendorCode = code.substring(14, 17);
+          const vendor = this.vendors.find(v => v.code === vendorCode);
+
+          // Pos 18-20: Special Process / Lot Code
+          const specialProcess = code.substring(17, 20);
+
+          return {
+            supplier: supplier ? `${supplier.name} (${supplier.code})` : null,
+            model: model ? `${model.name} (${model.code})` : null,
+            part: part ? `${part.name} (${part.code})` : null,
+            year,
+            month,
+            day,
+            hour,
+            minutes,
+            eolResult1: eol1 ? eol1.label : null,
+            eolResult2: eol2 ? eol2.label : null,
+            finalInspection: finalInsp ? finalInsp.label : null,
+            vendor: vendor ? `${vendor.name} (${vendor.code})` : null,
+            specialProcess
+          };
+        },
+
+        /** Reset to idle state */
+        reset() {
+          this.state = 'idle';
+          this.scannedCode = '';
+          this.decoded = null;
+          this.errorMessage = '';
+        }
+      }
+    }).mount('#app');
+  </script>
+
+  <!-- Hidden container for file-based scanning -->
+  <div id="temp-reader" style="display: none;"></div>
+</body>
+</html>

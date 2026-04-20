@@ -1,0 +1,18 @@
+{
+  "suppliers": [
+    { "name": "Sri Lakshmi Industries", "code": "1L" }
+  ],
+  "models": [
+    { "name": "BI3", "code": "J" }
+  ],
+  "parts": [
+    { "name": "43860-02500 (FORK SHIFT 3,4 BI3)", "code": "1J" }
+  ],
+  "vendors": [
+    { "name": "Sri Lakshmi Industries", "code": "5L1" }
+  ],
+  "inspectionOptions": [
+    { "label": "OK", "code": "1" },
+    { "label": "NG", "code": "2" }
+  ]
+}
